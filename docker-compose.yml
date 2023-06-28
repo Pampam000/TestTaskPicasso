@@ -1,0 +1,81 @@
+version: "3.9"
+
+volumes:
+  pg_data:
+
+services:
+  web:
+    container_name: web
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "9000:9000"
+    command: >
+      sh -c "python manage.py makemigrations &&
+             python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:9000"
+    volumes:
+      - ./project:/src/project
+    depends_on:
+      test_db:
+        condition: service_healthy
+    links:
+      - test_db
+      - redis
+    healthcheck:
+      test: [ "CMD", "curl", "-X", "OPTIONS", "-f", "http://0.0.0.0:9000/files/" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: on-failure
+
+  test_db:
+    container_name: test_db
+    image: postgres:15
+    env_file:
+      - .env
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    command: -p 5431
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U user -d database -p 5431" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: on-failure
+
+
+  redis:
+    container_name: redis
+    image: redis:latest
+
+    healthcheck:
+      test: [ "CMD-SHELL", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: on-failure
+
+  worker:
+    container_name: worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./project:/src/project
+    command: celery -A project worker --loglevel=info
+    links:
+      - redis
+      - web
+    depends_on:
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+
+
+
+
