@@ -1,0 +1,1 @@
+web: celery -A files worker --loglevel=info && gunicorn main.wsgi  --bind 0.0.0.0:9000

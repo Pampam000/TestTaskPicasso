@@ -9,6 +9,5 @@ class File(models.Model):
     processed = models.BooleanField(default=False)
 
     def mark_as_processed(self):
-
         self.processed = True
         self.save()
